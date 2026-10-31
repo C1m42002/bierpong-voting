@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bierpong Admin - Kostüm Voting</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="admin">
+  <div class="container">
+    <h1>🎅 BEERPONG TURNIER 🎅<br/>Nikolaus Special - Kostüm Voting</h1>
+
+    <!-- Excel Upload -->
+    <section class="card">
+      <h2>1. Teams aus Excel laden</h2>
+      <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" />
+      <button onclick="uploadExcel()" class="btn-primary">Excel hochladen</button>
+      <div id="excelStatus"></div>
+    </section>
+
+    <!-- Teams Anzeige -->
+    <section class="card">
+      <h2>2. Bilder zu Teams hochladen</h2>
+      <div id="teamsList" class="teams-grid"></div>
+    </section>
+
+    <!-- QR Code -->
+    <section class="card">
+      <h2>3. QR-Code für Voter</h2>
+      <div id="qrContainer"></div>
+      <button onclick="generateQR()" class="btn-primary">QR-Code generieren</button>
+    </section>
+
+    <!-- Ergebnisse -->
+    <section class="card">
+      <h2>4. Live Ergebnisse</h2>
+      <button onclick="loadResults()" class="btn-secondary">Ergebnisse aktualisieren</button>
+      <div id="resultsList"></div>
+    </section>
+  </div>
+
+  <script>
+    // Teams laden beim Start
+    loadTeams();
+    setInterval(loadResults, 5000); // Auto-refresh alle 5s
+
+    async function uploadExcel() {
+      const file = document.getElementById('excelFile').files[0];
+      if (!file) return alert('Bitte Datei wählen');
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/excel', { method: 'POST', body: formData });
+        const data = await res.json();
+        document.getElementById('excelStatus').innerHTML = `✅ ${data.count} Teams geladen`;
+        loadTeams();
+      } catch (error) {
+        document.getElementById('excelStatus').innerHTML = `❌ Fehler: ${error.message}`;
+      }
+    }
+
+    async function loadTeams() {
+      const teams = await fetch('/api/teams').then(r => r.json());
+      const html = teams.map(team => `
+        <div class="team-card">
+          <h3>${team.name}</h3>
+          ${team.image ? `<img src="${team.image}" alt="${team.name}" style="max-width: 100%; border-radius: 8px; margin: 10px 0;">` : '<div style="background: #eee; width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: #999;">Kein Bild</div>'}
+          <input type="file" id="image_${team.id}" accept="image/*" />
+          <button onclick="uploadImage(${team.id})" class="btn-secondary">Bild hochladen</button>
+        </div>
+      `).join('');
+      document.getElementById('teamsList').innerHTML = html;
+    }
+
+    async function uploadImage(teamId) {
+      const file = document.getElementById(`image_${teamId}`).files[0];
+      if (!file) return alert('Bitte Bild wählen');
+
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('teamId', teamId);
+
+      try {
+        const res = await fetch('/api/images', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ Bild hochgeladen');
+          loadTeams();
+        }
+      } catch (error) {
+        alert(`❌ Fehler: ${error.message}`);
+      }
+    }
+
+    async function generateQR() {
+      try {
+        const res = await fetch('/api/qr');
+        const { qr, url } = await res.json();
+        document.getElementById('qrContainer').innerHTML = `
+          <img src="${qr}" style="max-width: 300px; border: 2px solid #333; padding: 10px; background: white; border-radius: 8px;">
+          <p style="color: #666; font-size: 12px; margin: 10px 0;">QR öffnet: <code>${url}</code></p>
+          <button onclick="printQR()" class="btn-secondary">QR ausdrucken</button>
+        `;
+      } catch (error) {
+        alert('Fehler beim Generieren: ' + error.message);
+      }
+    }
+
+    function printQR() {
+      const w = window.open();
+      w.document.write(`<img src="${document.querySelector('#qrContainer img').src}" style="max-width: 500px;">`);
+      w.print();
+    }
+
+    async function loadResults() {
+      try {
+        const res = await fetch('/api/results');
+        const { results, totalVotes } = await res.json();
+
+        const sorted = [...results].sort((a, b) => b.votes - a.votes);
+        const html = `
+          <p><strong>Gesamt abgestimmt: ${totalVotes}</strong></p>
+          ${sorted.map(t => `
+            <div style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <strong>${t.name}</strong>
+                <span>${t.votes} Votes (${t.percentage}%)</span>
+              </div>
+              <div style="background: #ddd; height: 8px; border-radius: 4px; overflow: hidden;">
+                <div style="background: #4CAF50; height: 100%; width: ${t.percentage}%;" />
+              </div>
+            </div>
+          `).join('')}
+        `;
+        document.getElementById('resultsList').innerHTML = html;
+      } catch (error) {
+        console.error('Error loading results:', error);
+      }
+    }
+  </script>
+</body>
+</html>

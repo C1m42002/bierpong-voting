@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nikolaus Beerpong - Kostüm Voting 🎅</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="voter">
+  <div class="container voter-container">
+    <!-- QR Code Anzeige -->
+    <div id="qrDisplay" class="qr-display"></div>
+
+    <!-- Diashow -->
+    <div class="slideshow">
+      <div class="slide-header">
+        <button onclick="previousTeam()" class="btn-nav">← Zurück</button>
+        <span id="slideCount"></span>
+        <button onclick="nextTeam()" class="btn-nav">Weiter →</button>
+      </div>
+
+      <div id="currentTeam" class="team-display">
+        <img id="teamImage" src="" alt="Team Bild" />
+        <h2 id="teamName"></h2>
+      </div>
+
+      <div class="vote-section">
+        <button id="voteBtn" onclick="submitVote()" class="btn-vote">👏 FÜR DIESES TEAM ABSTIMMEN 👏</button>
+        <div id="voteStatus" class="status-message"></div>
+      </div>
+    </div>
+
+    <p style="text-align: center; color: #999; margin-top: 20px; font-size: 12px;">
+      Du kannst nur einmal abstimmen. Nach deiner Abstimmung kannst du noch alle Teams anschauen, aber nicht mehr abstimmen.
+    </p>
+  </div>
+
+  <script>
+    let teams = [];
+    let currentIndex = 0;
+    let hasVoted = false;
+    let deviceId = null;
+
+    // Init beim Laden
+    init();
+
+    async function init() {
+      // Device ID generieren/laden
+      deviceId = getDeviceId();
+
+      // Teams laden
+      teams = await fetch('/api/teams').then(r => r.json());
+      if (teams.length === 0) {
+        document.querySelector('.slideshow').innerHTML = '❌ Keine Teams gefunden. Admin muss Teams hochladen.';
+        return;
+      }
+
+      // Check ob schon abgestimmt
+      const voted = await fetch('/api/check-voted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId })
+      }).then(r => r.json());
+
+      hasVoted = voted.voted;
+
+      // QR anzeigen
+      loadQR();
+
+      // Erste Team anzeigen
+      showTeam(0);
+
+      // Vote Button Update
+      updateVoteButton();
+    }
+
+    function getDeviceId() {
+      let id = localStorage.getItem('voterDeviceId');
+      if (!id) {
+        id = 'dev_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+        localStorage.setItem('voterDeviceId', id);
+      }
+      return id;
+    }
+
+    async function loadQR() {
+      try {
+        const { qr } = await fetch('/api/qr').then(r => r.json());
+        document.getElementById('qrDisplay').innerHTML = `
+          <div style="position: fixed; top: 10px; right: 10px; background: white; padding: 8px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 100;">
+            <img src="${qr}" style="width: 80px; height: 80px; display: block;" alt="QR Code" />
+          </div>
+        `;
+      } catch (error) {
+        console.error('QR loading failed:', error);
+      }
+    }
+
+    function showTeam(index) {
+      if (index < 0 || index >= teams.length) return;
+      currentIndex = index;
+
+      const team = teams[currentIndex];
+      document.getElementById('teamImage').src = team.image || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect fill="%23eee" width="400" height="400"/%3E%3Ctext x="50%25" y="50%25" font-size="20" fill="%23999" text-anchor="middle" dy=".3em"%3EKein Bild%3C/text%3E%3C/svg%3E';
+      document.getElementById('teamName').textContent = team.name;
+      document.getElementById('slideCount').textContent = `${currentIndex + 1} / ${teams.length}`;
+    }
+
+    function previousTeam() {
+      if (currentIndex > 0) showTeam(currentIndex - 1);
+    }
+
+    function nextTeam() {
+      if (currentIndex < teams.length - 1) showTeam(currentIndex + 1);
+    }
+
+    function updateVoteButton() {
+      const btn = document.getElementById('voteBtn');
+      if (hasVoted) {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.textContent = '✅ Du hast bereits abgestimmt!';
+      } else {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.textContent = '👏 FÜR DIESES TEAM ABSTIMMEN 👏';
+      }
+    }
+
+    async function submitVote() {
+      if (hasVoted) {
+        alert('Du hast bereits abgestimmt! 🗳️');
+        return;
+      }
+
+      const teamId = teams[currentIndex].id;
+      try {
+        const res = await fetch('/api/vote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ teamId, deviceId })
+        });
+
+        if (!res.ok) {
+          throw new Error('Already voted from this device');
+        }
+
+        hasVoted = true;
+        updateVoteButton();
+        document.getElementById('voteStatus').innerHTML = '✅ Danke für deine Abstimmung! 🎉';
+      } catch (error) {
+        document.getElementById('voteStatus').innerHTML = `❌ ${error.message}`;
+      }
+    }
+  </script>
+</body>
+</html>
