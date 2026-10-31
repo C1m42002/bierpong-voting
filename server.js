@@ -9,12 +9,17 @@ import QRCode from 'qrcode';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
-// Verzeichnisse
-const dataDir = path.join(__dirname, 'data');
+// Verzeichnisse - für Vercel auch im /tmp nutzen
+const isVercel = process.env.VERCEL === '1';
+const dataDir = isVercel ? '/tmp/data' : path.join(__dirname, 'data');
 const imagesDir = path.join(dataDir, 'images');
 
 [dataDir, imagesDir].forEach(dir => {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  try {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  } catch (e) {
+    console.error('Could not create directory:', dir, e.message);
+  }
 });
 
 // Datei-Pfade
