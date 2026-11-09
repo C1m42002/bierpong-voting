@@ -13,17 +13,17 @@
 
     <!-- Diashow -->
     <div class="slideshow">
+      <div id="currentTeam" class="team-display">
+        <img id="teamImage" src="" alt="Team Bild" />
+        <h2 id="teamName"></h2>
+      </div>
+
       <div class="slide-header">
         <button onclick="previousTeam()" class="btn-nav">← Zurück</button>
         <span id="slideCount"></span>
         <button onclick="nextTeam()" class="btn-nav">Weiter →</button>
       </div>
-      <button id="autoPlayBtn" onclick="toggleAutoPlay()" class="btn-nav" style="background: #165b33; color: white; margin-top: 8px;">▶️ Auto-Diashow starten</button>
-
-      <div id="currentTeam" class="team-display">
-        <img id="teamImage" src="" alt="Team Bild" />
-        <h2 id="teamName"></h2>
-      </div>
+      <button id="autoPlayBtn" onclick="toggleAutoPlay()" class="btn-nav" style="background: #165b33; color: white; margin-top: 8px; width: 100%;">▶️ Auto-Diashow starten</button>
 
       <div class="vote-section">
         <button id="voteBtn" onclick="submitVote()" class="btn-vote">👏 FÜR DIESES TEAM ABSTIMMEN 👏</button>
@@ -111,10 +111,27 @@
 
     function previousTeam() {
       if (currentIndex > 0) showTeam(currentIndex - 1);
+      // Reset Auto-Play Timer wenn manuell navigiert
+      if (isAutoPlaying) {
+        clearInterval(autoPlayInterval);
+        autoPlayInterval = setInterval(() => {
+          if (currentIndex < teams.length - 1) nextTeam();
+          else showTeam(0);
+        }, 4000);
+      }
     }
 
     function nextTeam() {
       if (currentIndex < teams.length - 1) showTeam(currentIndex + 1);
+      else showTeam(0);
+      // Reset Auto-Play Timer wenn manuell navigiert
+      if (isAutoPlaying) {
+        clearInterval(autoPlayInterval);
+        autoPlayInterval = setInterval(() => {
+          if (currentIndex < teams.length - 1) showTeam(currentIndex + 1);
+          else showTeam(0);
+        }, 4000);
+      }
     }
 
     function updateVoteButton() {
