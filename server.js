@@ -168,6 +168,15 @@ app.get('/api/results', (req, res) => {
   res.json({ results, totalVotes });
 });
 
+// API: Votes zurücksetzen (Admin)
+app.post('/api/reset-votes', (req, res) => {
+  saveJSON(votesFile, {});
+  const teams = loadJSON(teamsFile, []);
+  teams.forEach(t => t.votes = 0);
+  saveJSON(teamsFile, teams);
+  res.json({ success: true, message: 'Alle Votes zurückgesetzt' });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🍻 Bierpong Voting started at http://localhost:${PORT}`);

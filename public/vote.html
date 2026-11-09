@@ -18,6 +18,7 @@
         <span id="slideCount"></span>
         <button onclick="nextTeam()" class="btn-nav">Weiter →</button>
       </div>
+      <button id="autoPlayBtn" onclick="toggleAutoPlay()" class="btn-nav" style="background: #165b33; color: white; margin-top: 8px;">▶️ Auto-Diashow starten</button>
 
       <div id="currentTeam" class="team-display">
         <img id="teamImage" src="" alt="Team Bild" />
@@ -40,6 +41,8 @@
     let currentIndex = 0;
     let hasVoted = false;
     let deviceId = null;
+    let autoPlayInterval = null;
+    let isAutoPlaying = false;
 
     // Init beim Laden
     init();
@@ -150,6 +153,26 @@
         document.getElementById('voteStatus').innerHTML = '✅ Danke für deine Abstimmung! 🎉';
       } catch (error) {
         document.getElementById('voteStatus').innerHTML = `❌ ${error.message}`;
+      }
+    }
+
+    function toggleAutoPlay() {
+      isAutoPlaying = !isAutoPlaying;
+      const btn = document.getElementById('autoPlayBtn');
+
+      if (isAutoPlaying) {
+        btn.textContent = '⏸️ Auto-Diashow pausieren';
+        autoPlayInterval = setInterval(() => {
+          if (currentIndex < teams.length - 1) {
+            nextTeam();
+          } else {
+            currentIndex = 0;
+            showTeam(0);
+          }
+        }, 4000);
+      } else {
+        btn.textContent = '▶️ Auto-Diashow starten';
+        clearInterval(autoPlayInterval);
       }
     }
   </script>
