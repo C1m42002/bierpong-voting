@@ -45,6 +45,11 @@ const uploadImage = multer({ storage: imageStorage });
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Root route
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
 // Helper: Daten laden/speichern
 const loadJSON = (filePath, defaultValue = []) => {
   if (!fs.existsSync(filePath)) return defaultValue;
