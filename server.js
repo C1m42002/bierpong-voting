@@ -25,6 +25,7 @@ const imagesDir = path.join(dataDir, 'images');
 // Datei-Pfade
 const teamsFile = path.join(dataDir, 'teams.json');
 const votesFile = path.join(dataDir, 'votes.json');
+const stateFile = path.join(dataDir, 'state.json');
 
 // Storage für Multer
 const imageStorage = multer.diskStorage({
@@ -124,10 +125,14 @@ app.post('/api/vote', (req, res) => {
     const { teamId, deviceId } = req.body;
     const votes = loadJSON(votesFile, {});
     const teams = loadJSON(teamsFile, []);
+    const state = loadJSON(stateFile, { resetTime: 0 });
 
-    // Check: Device hat schon gewählt?
+    // Check: Device hat schon nach dem letzten Reset gewählt?
     if (votes[deviceId]) {
-      return res.status(403).json({ error: 'Already voted from this device' });
+      const voteTime = new Date(votes[deviceId].timestamp).getTime();
+      if (voteTime > state.resetTime) {
+        return res.status(403).json({ error: 'Already voted from this device' });
+      }
     }
 
     // Vote speichern
@@ -151,7 +156,11 @@ app.post('/api/vote', (req, res) => {
 app.post('/api/check-voted', (req, res) => {
   const { deviceId } = req.body;
   const votes = loadJSON(votesFile, {});
-  res.json({ voted: !!votes[deviceId] });
+  const state = loadJSON(stateFile, { resetTime: 0 });
+
+  // Falls Gerät vor Reset abgestimmt hat, darf es wieder
+  const hasVoted = votes[deviceId] && new Date(votes[deviceId].timestamp).getTime() > state.resetTime;
+  res.json({ voted: hasVoted });
 });
 
 // API: Ergebnisse (Admin)
@@ -170,11 +179,20 @@ app.get('/api/results', (req, res) => {
 
 // API: Votes zurücksetzen (Admin)
 app.post('/api/reset-votes', (req, res) => {
-  saveJSON(votesFile, {});
-  const teams = loadJSON(teamsFile, []);
-  teams.forEach(t => t.votes = 0);
-  saveJSON(teamsFile, teams);
-  res.json({ success: true, message: 'Alle Votes zurückgesetzt' });
+  try {
+    saveJSON(votesFile, {});
+    const teams = loadJSON(teamsFile, []);
+    teams.forEach(t => t.votes = 0);
+    saveJSON(teamsFile, teams);
+
+    // Reset-Zeit speichern - damit Geräte wieder abstimmen können
+    const state = { resetTime: new Date().getTime() };
+    saveJSON(stateFile, state);
+
+    res.json({ success: true, message: 'Alle Votes + Geräte-Status zurückgesetzt! ✅ Alle dürfen wieder abstimmen.' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
